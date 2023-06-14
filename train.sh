@@ -1,0 +1,11 @@
+python ./src/train.py \
+--output_dir ./models \
+--num_train_epochs 10 \
+--eval_steps 300 \
+--save_strategy steps \
+--save_steps 300 \
+--evaluation_strategy steps \
+--save_total_limit 2 \
+--logging_steps 100 \
+--do_train \
+--do_eval
