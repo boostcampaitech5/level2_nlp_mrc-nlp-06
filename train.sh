@@ -1,6 +1,6 @@
 python ./src/train.py \
 --output_dir ./models \
---num_train_epochs 10 \
+--num_train_epochs 1 \
 --eval_steps 300 \
 --save_strategy steps \
 --save_steps 300 \
@@ -8,4 +8,6 @@ python ./src/train.py \
 --save_total_limit 2 \
 --logging_steps 100 \
 --do_train \
---do_eval
+--do_eval \
+--load_best_model_at_end True \
+--metric_for_best_model exact_match
