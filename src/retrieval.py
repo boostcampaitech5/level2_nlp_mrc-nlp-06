@@ -19,7 +19,6 @@ def timer(name):
     yield
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
-
 class SparseRetrieval:
     def __init__(
         self,
@@ -61,9 +60,7 @@ class SparseRetrieval:
 
         # Transform by vectorizer
         self.tfidfv = TfidfVectorizer(
-            # max_feature 제한 풀기
-            #tokenizer=tokenize_fn, ngram_range=(1, 2), max_features=50000,
-            tokenizer=tokenize_fn, ngram_range=(1, 2),
+            tokenizer=tokenize_fn, ngram_range=(1, 2), max_features=50000,
         )
 
         self.p_embedding = None  # get_sparse_embedding()로 생성합니다
@@ -196,7 +193,16 @@ class SparseRetrieval:
                 if "context" in example.keys() and "answers" in example.keys():
                     # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
                     tmp["original_context"] = example["context"]
+                    tmp['true_doc'] = ToPostIdx[example["context"]]
                     tmp["answers"] = example["answers"]
+                    tmp['context_doc'] = " ".join([f'{ToPostIdx[self.contexts[pid]]}' for pid in doc_indices[idx]])
+                    int_list = [int(x) for x in tmp['context_doc'].split()]
+                    try:
+                        ans_idx = int_list.index(int(tmp['true_doc']))
+                    except ValueError:
+                        ans_idx = -1
+                        
+                    tmp['MRR'] = 1 / (ans_idx+1) if ans_idx +1 >0 else 0
                 total.append(tmp)
 
             cqas = pd.DataFrame(total)
@@ -333,7 +339,7 @@ class SparseRetrieval:
                     except ValueError:
                         ans_idx = -1
                         
-                    tmp['MRR'] = ans_idx+1 if ans_idx +1 >0 else 0
+                    tmp['MRR'] = 1 / (ans_idx+1) if ans_idx +1 >0 else 0
                 total.append(tmp)
 
             return pd.DataFrame(total)
@@ -388,7 +394,6 @@ class SparseRetrieval:
         return D.tolist(), I.tolist()
 
 
-
 if __name__ == "__main__":
 
     import argparse
@@ -409,14 +414,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--context_path", metavar="wikipedia_documents", type=str, default = "wikipedia_documents.json", help=""
     )
-    parser.add_argument("--use_faiss", metavar=False, type=bool, default = True, help="")
+    parser.add_argument("--use_faiss", metavar=False, type=bool, default = False, help="")
 
     args = parser.parse_args()
-    
+
     # ToPostIdx = {문서 내용 : wiki 문서 출처}
     
     with open(os.path.join(args.data_path, args.context_path), "r", encoding="utf-8") as f:
         wiki = json.load(f)
+        
     ToPostIdx = {}
     for v in wiki.values():
         ToPostIdx[v['text']] = v['document_id']
@@ -445,20 +451,15 @@ if __name__ == "__main__":
     retriever.get_sparse_embedding()
     retriever.build_faiss(num_clusters=64)
     
-    # faiss를 기본 세팅으로 합니다.
+    top_k = 100
     if args.use_faiss:
-        top_k = 100
-        # test bulk
         with timer("bulk query by exhaustive search"):
             df = retriever.retrieve_faiss(full_ds, top_k)
         
-        df.to_csv(f'./data/retrieval_result/tfidf_uni,bi.csv', index=False)
+        df.to_csv(f'./data/retrieval_result/tfidf_uni,bi_faiss.csv', index=False)
 
     else:
         with timer("bulk query by exhaustive search"):
-            df = retriever.retrieve(full_ds)
-            df["correct"] = df["original_context"] == df["context"]
-            print(
-                "correct retrieval result by exhaustive search",
-                df["correct"].sum() / len(df),
-            )
+            df = retriever.retrieve(full_ds, top_k)
+            
+        df.to_csv(f'./data/retrieval_result/tfidf_uni,bi.csv', index=False)
