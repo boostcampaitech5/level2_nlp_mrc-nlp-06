@@ -31,6 +31,8 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
+#from CustomRoberta import CustomRobertaForQuestionAnswering
+
 
 logger = logging.getLogger(__name__)
 
@@ -81,17 +83,25 @@ def main():
         if model_args.config_name
         else model_args.model_name_or_path,
     )
+    config.clf_layer = model_args.clf_layer
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
         else model_args.model_name_or_path,
         use_fast=True,
     )
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-    )
+    if model_args.clf_layer == "linear":
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
+    else:
+        model = CustomRobertaForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
@@ -156,6 +166,7 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             }
         )
+    breakpoint()
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
 
@@ -197,7 +208,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
