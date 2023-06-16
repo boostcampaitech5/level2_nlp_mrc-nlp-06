@@ -210,6 +210,9 @@ data/
 models/
 predictions/
 wandb/
+eda/
+mecab/
+*.csv
 
 .ipython/
 .jupyter/

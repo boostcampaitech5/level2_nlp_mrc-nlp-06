@@ -148,7 +148,7 @@ class BM25Retrieval:
     def __init__(
         self,
         tokenize_fn,
-        data_path: Optional[str] = "../data/",
+        data_path: Optional[str] = "../../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
     ) -> None:
 
@@ -169,8 +169,6 @@ class BM25Retrieval:
 
             data_path/context_path가 존재해야합니다.
 
-        Summary:
-            Passage 파일을 불러오고 TfidfVectorizer를 선언하는 기능을 합니다.
         """
 
         self.data_path = data_path
@@ -184,7 +182,8 @@ class BM25Retrieval:
         self.context2id = {item : i for i, item in enumerate(self.contexts)}
 
         self.tokenizer = tokenize_fn
-        self.bm25 = BM25Okapi(self.contexts, self.tokenizer)
+        with timer('make BM25 object'):
+            self.bm25 = BM25Okapi(self.contexts, self.tokenizer)
 
     def retrieve(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
@@ -206,8 +205,6 @@ class BM25Retrieval:
                 Ground Truth가 있는 Query (train/valid) -> 기존 Ground Truth Passage를 같이 반환합니다.
                 Ground Truth가 없는 Query (test) -> Retrieval한 Passage만 반환합니다.
         """
-        print(type(query_or_dataset))
-        assert isinstance(query_or_dataset, Dataset)
 
         # Retrieve한 Passage를 pd.DataFrame으로 반환합니다.
         total = []
@@ -219,19 +216,20 @@ class BM25Retrieval:
                 "question": example["question"],
                 "id": example["id"],
                 # Retrieve한 context를 반환합니다.
-                "context": ' '.join([' '.join(i) for i in self.bm25.get_top_n(example['question'], topk)])
+                "context": ' '.join([' '.join(i) for i in self.bm25.get_top_n(example['question'], topk)]),
+                "doc_idx" : ' '.join([str(i) for i in self.bm25.get_top_n_idx(example['question'], topk)])
             }
             if "context" in example.keys() and "answers" in example.keys():
                 # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
-                tmp["original_context"] = example["context"]
-                tmp["answers"] = example["answers"]
+                tmp["original_context"] = example["context"],
+                tmp["true_doc"] = self.context2id[example['context']]
                 # Retrieve한 context id를 반환합니다.
-                tmp["doc_idx"] = str(list(self.bm25.get_top_n_idx(example['question'], topk)))
+                tmp["answers"] = example["answers"]
 
             total.append(tmp)
 
-            cqas = pd.DataFrame(total)
-            return cqas
+        cqas = pd.DataFrame(total)
+        return cqas
 
 
 if __name__ == "__main__":
