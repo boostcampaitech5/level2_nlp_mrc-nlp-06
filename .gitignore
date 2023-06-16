@@ -210,6 +210,7 @@ data/
 models/
 predictions/
 wandb/
+eda/
 
 .ipython/
 .jupyter/
@@ -231,3 +232,4 @@ wandb/
 .condarc
 
 *.ipynb
+*.csv
