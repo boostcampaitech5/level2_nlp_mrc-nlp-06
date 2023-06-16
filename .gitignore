@@ -211,11 +211,6 @@ models/
 predictions/
 wandb/
 eda/
-<<<<<<< HEAD
-=======
-mecab/
-*.csv
->>>>>>> bm25
 
 .ipython/
 .jupyter/
