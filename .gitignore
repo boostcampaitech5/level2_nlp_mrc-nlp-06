@@ -210,7 +210,11 @@ data/
 models/
 predictions/
 wandb/
+<<<<<<< HEAD
 eda/
+=======
+src/retriever/retrieval_result
+>>>>>>> 59d6a43dcba829632a5d38e94f5962e290518a45
 
 .ipython/
 .jupyter/
@@ -232,4 +236,8 @@ eda/
 .condarc
 
 *.ipynb
+<<<<<<< HEAD
 *.csv
+=======
+*.csv
+>>>>>>> 59d6a43dcba829632a5d38e94f5962e290518a45
