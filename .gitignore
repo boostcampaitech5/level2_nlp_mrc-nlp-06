@@ -210,11 +210,9 @@ data/
 models/
 predictions/
 wandb/
-<<<<<<< HEAD
 eda/
-=======
 src/retriever/retrieval_result
->>>>>>> 59d6a43dcba829632a5d38e94f5962e290518a45
+src/retriever/elastic_search/elasticsearch-7.17.10/
 
 .ipython/
 .jupyter/
