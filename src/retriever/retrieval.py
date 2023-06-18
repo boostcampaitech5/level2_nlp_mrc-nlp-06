@@ -415,14 +415,17 @@ if __name__ == "__main__":
         "--context_path", metavar="wikipedia_documents", type=str, default = "wikipedia_documents.json", help=""
     )
     parser.add_argument("--use_faiss", metavar=False, type=bool, default = False, help="")
+    
+    parser.add_argument("--output_dir", metavar="./data", type=str, default="./src/retriever/retrieval_result", help="")
 
+    parser.add_argument("--result_name", metavar="./data", type=str, help="")
+    
     args = parser.parse_args()
 
-    # ToPostIdx = {문서 내용 : wiki 문서 출처}
-    
     with open(os.path.join(args.data_path, args.context_path), "r", encoding="utf-8") as f:
         wiki = json.load(f)
         
+    # ToPostIdx = {문서 내용 : wiki 문서 출처}    
     ToPostIdx = {}
     for v in wiki.values():
         ToPostIdx[v['text']] = v['document_id']
@@ -452,14 +455,18 @@ if __name__ == "__main__":
     retriever.build_faiss(num_clusters=64)
     
     top_k = 100
+    
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    
     if args.use_faiss:
         with timer("bulk query by exhaustive search"):
             df = retriever.retrieve_faiss(full_ds, top_k)
         
-        df.to_csv(f'./data/retrieval_result/tfidf_uni,bi_faiss.csv', index=False)
+        df.to_csv(os.path.join(args.output_dir,args.result_name)+'.csv', index=False)
 
     else:
         with timer("bulk query by exhaustive search"):
             df = retriever.retrieve(full_ds, top_k)
             
-        df.to_csv(f'./data/retrieval_result/tfidf_uni,bi.csv', index=False)
+        df.to_csv(os.path.join(args.output_dir,args.result_name)+'.csv', index=False)

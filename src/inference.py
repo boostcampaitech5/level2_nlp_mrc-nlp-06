@@ -20,7 +20,7 @@ from datasets import (
 )
 import evaluate
 from utils import *
-from retrieval import SparseRetrieval
+from retriever.retrieval import SparseRetrieval
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
