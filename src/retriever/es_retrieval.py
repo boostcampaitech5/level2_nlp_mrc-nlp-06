@@ -61,13 +61,12 @@ class ESRetrieval:
                 tmp['answers'] = item['answers']
                 tmp['context_doc'] = ids
 
-                try : ans_idx = item['topk'].index(f"{item['gold_doc']}")
+                try : ans_idx = ids.index(f"{tmp['true_doc']}")
                 except : ans_idx = -1
                 if ans_idx >= 0:
                     tmp['RR'] = 1 / (ans_idx + 1) 
                 else:
                     tmp['RR'] = 0
-
             total.append(tmp)
 
         df = pd.DataFrame(total)
