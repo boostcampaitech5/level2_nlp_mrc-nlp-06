@@ -30,7 +30,6 @@ if __name__ == "__main__":
         evaluation_strategy="epoch",
         learning_rate=3e-4,
         per_device_train_batch_size=4,
-        per_device_eval_batch_size=4, # 안씀
         num_train_epochs=2,
         weight_decay=0.01
     )
@@ -50,7 +49,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # 학습된 encoder 주소 있을 경우 학습된거 가져와야 함
+    # 학습된 encoder 가져오기
     q_encoder = BertEncoder.from_pretrained(args.model_name_or_path).to(device)
     p_encoder = BertEncoder.from_pretrained(args.model_name_or_path).to(device)
     p_encoder.load_state_dict(torch.load('./src/retriever/passage_encoder/model.pt'))
@@ -64,11 +63,6 @@ if __name__ == "__main__":
                            args = model_args)
     
     df = pd.DataFrame()
-    for i in range(1,101):
-        df1 = retriever.retrieve(train_dataset.select(range(39 * (i-1),39 * i)), 100,'dense_embedding2')
-        df = pd.concat([df1,df])
-        
-    df1 = retriever.retrieve(train_dataset.select(range(3900,3952)), 100,'dense_embedding2')
-    df = pd.concat([df1,df])
+    df = retriever.retrieve(valid_dataset,100, 'dense_embedding')
     
-    df.to_csv('./src/retriever/retrieval_result/dense_shuffle.csv',index = False)
+    df.to_csv('./src/retriever/retrieval_result/dense.csv',index = False)

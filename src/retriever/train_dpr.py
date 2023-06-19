@@ -91,7 +91,7 @@ class DenseRetrieval:
 
         self.contexts = list(
             dict.fromkeys([v["text"] for v in wiki.values()])
-        )  # set 은 매번 순서가 바뀌므로
+        )
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         
         self.ids = list(range(len(self.contexts)))
@@ -109,10 +109,7 @@ class DenseRetrieval:
     def prepare_in_batch_negative(self,dataset):
         ''' 
         In batch negative가 적용된 train_dataloader를 만들어주는 함수
-        '''
-
-
-        # CORPUS를 np.array로 변환해줍니다.        
+        '''     
         corpus = np.array(self.contexts)
         p_with_neg = []
         for idx, context in enumerate(dataset['context']):
@@ -151,11 +148,7 @@ class DenseRetrieval:
         return DataLoader(train_dataset, shuffle=True, batch_size=self.args.per_device_train_batch_size)
     
     def train(self, args=None):
-        '''
-            1. prepare_in_batch_negative
-                 -> self.train_dataloader (in batch_negative sampling dataloader)
-                 -> self.passage_dataloader ()
-        '''
+        
         self.train_dataloader = self.prepare_in_batch_negative(self.dataset['train'])
         self.valid_dataloader = self.prepare_in_batch_negative(self.dataset['validation'])
 
@@ -173,7 +166,7 @@ class DenseRetrieval:
         optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
         t_total = len(self.train_dataloader) // args.gradient_accumulation_steps * args.num_train_epochs
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total)
-        # Start training!
+        
         global_step = 0
         eval_step = 100
         self.p_encoder.zero_grad()
@@ -181,7 +174,6 @@ class DenseRetrieval:
         torch.cuda.empty_cache()
         
         train_iterator = tqdm(range(int(args.num_train_epochs)), desc="Epoch")
-        # for _ in range(int(args.num_train_epochs)):
         for _ in train_iterator:
             with tqdm(self.train_dataloader, unit="batch") as tepoch:
                 for batch in tepoch:
@@ -257,8 +249,6 @@ class DenseRetrieval:
                                 valid_steps += 1
                                 del valid_p_inputs, valid_q_inputs                                
                         
-                        
-                        #로스 계산
                         valid_loss /= valid_steps
                         wandb.log({'valid_loss': valid_loss})                        
                     wandb.log({"train_loss": loss, "global_step": global_step})
@@ -395,11 +385,8 @@ if __name__ == "__main__":
         args.model_name_or_path,
         use_fast=True,)
     
-    # 학습된 encoder 주소 있을 경우 학습된거 가져와야 함
     p_encoder = BertEncoder.from_pretrained(args.model_name_or_path).to(model_args.device.type)
     q_encoder = BertEncoder.from_pretrained(args.model_name_or_path).to(model_args.device.type)
-
-    
     
     retriever = DenseRetrieval(model_name = 'klue/bert-base',
                            dataset = org_dataset,
@@ -407,12 +394,10 @@ if __name__ == "__main__":
                            p_encoder = p_encoder,
                            args = model_args)
     
-    wandb.init(project='MRC_Retriever', name='yh_dpr_sleep2')
+    wandb.init(project='MRC_Retriever', name='yh_dpr')
 
-    # 만약에 학습이 안되어 있을 경우만!! 근데 왠만해선 학습된 상태에서 꺼낼듯
-    # 우선은 학습만 할 것!
     retriever.train()
-    retriever.get_dense_embedidng('dense_embedding2')
+    retriever.get_dense_embedidng('dense_embedding')
     torch.save(retriever.p_encoder.state_dict(),'./src/retriever/passage_encoder/model.pt')
     torch.save(retriever.q_encoder.state_dict(),'./src/retriever/query_encoder/model.pt')
 
