@@ -1,6 +1,6 @@
 python ./src/train.py \
 --output_dir ./models \
---num_train_epochs 1 \
+--num_train_epochs 5 \
 --eval_steps 300 \
 --save_strategy steps \
 --save_steps 300 \
@@ -10,4 +10,5 @@ python ./src/train.py \
 --do_train \
 --do_eval \
 --load_best_model_at_end True \
---metric_for_best_model exact_match
+--metric_for_best_model exact_match \
+--use_custom_roberta True

@@ -4,6 +4,7 @@ import shutil
 import sys
 
 from utils import *
+from models import *
 from datasets import DatasetDict, load_from_disk
 import evaluate
 from transformers import (
@@ -17,6 +18,7 @@ from transformers import (
     set_seed,
 )
 import wandb
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +72,25 @@ def main():
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-    )
+
+    # CustomRoberta 모델을 사용할지, automodel을 사용할지 선택합니다.
+    if model_args.use_custom_roberta:
+        config.emphasis_size = 2
+        config.cls_token_id = tokenizer.cls_token_id
+        config.sep_token_id = tokenizer.sep_token_id
+        config.period_token_id = tokenizer.vocab['.']
+        config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        model = CustomRobertaForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
+    else:
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
 
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
@@ -130,7 +146,8 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -212,8 +229,33 @@ def run_mrc(
             load_from_cache_file=not data_args.overwrite_cache,
         )
 
+    def tokenize_fn(x): return tokenizer.tokenize(x)
+    tfidfv = TfidfVectorizer(
+        tokenizer=tokenize_fn,
+        ngram_range=(1, 2),
+        max_features=50000,
+    )
     # Validation preprocessing
     def prepare_validation_features(examples):
+        # emphasis_embeddings을 위해 validation set에 대한 start/end postion을 찾습니다.
+        answers = []
+        for question, context in zip(examples[question_column_name if pad_on_right else context_column_name],
+                                     examples[context_column_name if pad_on_right else question_column_name]):
+            passage = context.split('.')
+            passage_embedding = tfidfv.fit_transform(passage)
+            query_vec = tfidfv.transform([question])
+
+            result = query_vec * passage_embedding.T
+            sorted_result = np.argsort(-result.data)
+            doc_id = result.indices[sorted_result].tolist()[0]
+            answer = passage[doc_id]
+
+            answers.append({
+                'answer_start': [context.find(answer)],
+                'text': [answer]
+            })
+        examples['answers'] = answers
+
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
         tokenized_examples = tokenizer(
@@ -224,12 +266,16 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
         sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+        # token의 캐릭터 단위 position를 찾을 수 있도록 offset mapping을 사용합니다.
+        # start_positions과 end_positions을 찾는데 도움을 줄 수 있습니다.
+        offset_mapping = tokenized_examples["offset_mapping"]
 
         # evaluation을 위해, prediction을 context의 substring으로 변환해야합니다.
         # corresponding example_id를 유지하고 offset mappings을 저장해야합니다.
@@ -250,6 +296,63 @@ def run_mrc(
                 (o if sequence_ids[k] == context_index else None)
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
+
+        # 데이터셋에 "start position", "enc position" label을 부여합니다.
+        tokenized_examples["start_positions"] = []
+        tokenized_examples["end_positions"] = []
+
+        for i, offsets in enumerate(offset_mapping):
+            input_ids = tokenized_examples["input_ids"][i]
+            cls_index = input_ids.index(tokenizer.cls_token_id)  # cls index
+
+            # sequence id를 설정합니다 (to know what is the context and what is the question).
+            sequence_ids = tokenized_examples.sequence_ids(i)
+
+            # 하나의 example이 여러개의 span을 가질 수 있습니다.
+            sample_index = sample_mapping[i]
+            answers = examples[answer_column_name][sample_index]
+
+            # answer가 없을 경우 cls_index를 answer로 설정합니다(== example에서 정답이 없는 경우 존재할 수 있음).
+            if len(answers["answer_start"]) == 0:
+                tokenized_examples["start_positions"].append(cls_index)
+                tokenized_examples["end_positions"].append(cls_index)
+            else:
+                # text에서 정답의 Start/end character index
+                start_char = answers["answer_start"][0]
+                end_char = start_char + len(answers["text"][0])
+
+                # text에서 current span의 Start token index
+                token_start_index = 0
+                while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
+                    token_start_index += 1
+
+                # text에서 current span의 End token index
+                token_end_index = len(input_ids) - 1
+                while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
+                    token_end_index -= 1
+
+                # 정답이 span을 벗어났는지 확인합니다(정답이 없는 경우 CLS index로 label되어있음).
+                if not (
+                    offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char
+                ):
+                    tokenized_examples["start_positions"].append(cls_index)
+                    tokenized_examples["end_positions"].append(cls_index)
+                else:
+                    # token_start_index 및 token_end_index를 answer의 끝으로 이동합니다.
+                    # Note: answer가 마지막 단어인 경우 last offset을 따라갈 수 있습니다(edge case).
+                    while (
+                        token_start_index < len(offsets)
+                        and offsets[token_start_index][0] <= start_char
+                    ):
+                        token_start_index += 1
+                    tokenized_examples["start_positions"].append(
+                        token_start_index - 1)
+                    while offsets[token_end_index][1] >= end_char:
+                        token_end_index -= 1
+                    tokenized_examples["end_positions"].append(
+                        token_end_index + 1)
+
         return tokenized_examples
 
     if training_args.do_eval:

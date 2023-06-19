@@ -18,7 +18,9 @@ from datasets import (
     Value,
     load_from_disk
 )
+import datasets
 import evaluate
+from models import *
 from utils import *
 from retriever.retrieval import SparseRetrieval
 from transformers import (
@@ -70,9 +72,9 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    datasets = load_from_disk(data_args.dataset_name)
+    datasetss = load_from_disk(data_args.dataset_name)
     print("loaded dataset: ")
-    print(datasets)
+    print(datasetss)
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
@@ -87,27 +89,41 @@ def main():
         else model_args.model_name_or_path,
         use_fast=True,
     )
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-    )
+
+    # CustomRoberta 모델을 사용할지, automodel을 사용할지 선택합니다.
+    if model_args.use_custom_roberta:
+        config.emphasis_size = 2
+        config.cls_token_id = tokenizer.cls_token_id
+        config.sep_token_id = tokenizer.sep_token_id
+        config.period_token_id = tokenizer.vocab['.']
+        config.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        model = CustomRobertaForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
+    else:
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
-        datasets = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args,
+        datasetss = run_sparse_retrieval(
+            tokenizer.tokenize, datasetss, training_args, data_args,
         )
 
     # eval or predict mrc model
     if training_args.do_eval or training_args.do_predict:
         run_mrc(data_args, training_args, model_args,
-                datasets, tokenizer, model)
+                datasetss, tokenizer, model)
 
 
 def run_sparse_retrieval(
     tokenize_fn: Callable[[str], List[str]],
-    datasets: DatasetDict,
+    datasetss: DatasetDict,
     training_args: TrainingArguments,
     data_args: DataTrainingArguments,
     data_path: str = "./data",
@@ -123,11 +139,11 @@ def run_sparse_retrieval(
     if data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)
         df = retriever.retrieve_faiss(
-            datasets["validation"], topk=data_args.top_k_retrieval
+            datasetss["validation"], topk=data_args.top_k_retrieval
         )
     else:
         df = retriever.retrieve(
-            datasets["validation"], topk=data_args.top_k_retrieval)
+            datasetss["validation"], topk=data_args.top_k_retrieval)
 
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
@@ -156,21 +172,22 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             }
         )
-    datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
-    return datasets
+    datasetss = DatasetDict(
+        {"validation": datasets.Dataset.from_pandas(df, features=f)})
+    return datasetss
 
 
 def run_mrc(
     data_args: DataTrainingArguments,
     training_args: TrainingArguments,
     model_args: ModelArguments,
-    datasets: DatasetDict,
+    datasetss: DatasetDict,
     tokenizer,
     model,
 ) -> None:
 
     # eval 혹은 prediction에서만 사용함
-    column_names = datasets["validation"].column_names
+    column_names = datasetss["validation"].column_names
 
     question_column_name = "question" if "question" in column_names else column_names[0]
     context_column_name = "context" if "context" in column_names else column_names[1]
@@ -182,7 +199,7 @@ def run_mrc(
 
     # 오류가 있는지 확인합니다.
     last_checkpoint, max_seq_length = check_no_error(
-        data_args, training_args, datasets, tokenizer
+        data_args, training_args, datasetss, tokenizer
     )
 
     # Validation preprocessing / 전처리를 진행합니다.
@@ -197,7 +214,8 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -225,7 +243,7 @@ def run_mrc(
             ]
         return tokenized_examples
 
-    eval_dataset = datasets["validation"]
+    eval_dataset = datasetss["validation"]
 
     # Validation Feature 생성
     eval_dataset = eval_dataset.map(
@@ -269,7 +287,7 @@ def run_mrc(
         elif training_args.do_eval:
             references = [
                 {"id": ex["id"], "answers": ex[answer_column_name]}
-                for ex in datasets["validation"]
+                for ex in datasetss["validation"]
             ]
 
             return EvalPrediction(
@@ -288,7 +306,7 @@ def run_mrc(
         args=training_args,
         train_dataset=None,
         eval_dataset=eval_dataset,
-        eval_examples=datasets["validation"],
+        eval_examples=datasetss["validation"],
         tokenizer=tokenizer,
         data_collator=data_collator,
         post_process_function=post_processing_function,
@@ -300,7 +318,7 @@ def run_mrc(
     # eval dataset & eval example - predictions.json 생성됨
     if training_args.do_predict:
         predictions = trainer.predict(
-            test_dataset=eval_dataset, test_examples=datasets["validation"]
+            test_dataset=eval_dataset, test_examples=datasetss["validation"]
         )
 
         # predictions.json 은 postprocess_qa_predictions() 호출시 이미 저장됩니다.

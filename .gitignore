@@ -208,6 +208,7 @@ pyrightconfig.json
 ### Custom ###
 data/
 models/
+!src/models/
 predictions/
 wandb/
 src/retriever/retrieval_result

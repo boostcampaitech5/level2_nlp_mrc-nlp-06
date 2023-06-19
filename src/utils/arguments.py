@@ -9,7 +9,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/bert-base",
+        default="klue/roberta-base",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -30,6 +30,12 @@ class ModelArguments:
         default=None,
         metadata={
             "help": "Pretrained model's run name"
+        },
+    )
+    use_custom_roberta: bool = field(
+        default=False,
+        metadata={
+            "help": "Use a custom roberta model instead of a default model"
         },
     )
 
