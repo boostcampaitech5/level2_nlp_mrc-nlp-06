@@ -32,6 +32,12 @@ class ModelArguments:
             "help": "Pretrained model's run name"
         },
     )
+    clf_layer: Optional[str] = field(
+        default="linear",
+        metadata={
+            "help": "Pretrained model's run name"
+        },
+    )
 
 
 @dataclass
@@ -89,7 +95,7 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=10,
+        default=40,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },
@@ -99,6 +105,6 @@ class DataTrainingArguments:
     )
 
     admin: Optional[str] = field(
-        default='MH',
+        default='JH',
         metadata={"help": "The name of the person running this code."},
     )
