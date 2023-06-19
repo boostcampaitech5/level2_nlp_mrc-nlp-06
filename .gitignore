@@ -94,7 +94,6 @@ docs/_build/
 target/
 
 # Jupyter Notebook
-!preprocess/*
 
 # IPython
 
@@ -232,3 +231,6 @@ wandb/
 .condarc
 
 *.ipynb
+
+
+!preprocess/*
