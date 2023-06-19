@@ -84,7 +84,12 @@ def main():
         if model_args.config_name
         else model_args.model_name_or_path,
     )
+
     config.clf_layer = model_args.clf_layer
+    config.max_seq_len = data_args.max_seq_length
+    if model_args.clf_layer == "SDS_cnn": # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
+        data_args.pad_to_max_length = True
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
@@ -105,7 +110,7 @@ def main():
         )
 
     # True일 경우 : run passage retrieval
-    if data_args.eval_retrieval:
+    if data_args.eval_retrieval: 
         datasetss = run_sparse_retrieval(
             tokenizer.tokenize, datasetss, training_args, data_args,
         )

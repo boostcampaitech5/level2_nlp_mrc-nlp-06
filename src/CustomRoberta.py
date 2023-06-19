@@ -2,7 +2,7 @@ from typing import Optional, Union, Tuple
 import torch
 import torch.nn as nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from transformers.models.roberta.modeling_roberta import *
+from transformers.models.roberta.modeling_roberta import RobertaPreTrainedModel,RobertaModel,QuestionAnsweringModelOutput
 
 """
 Custom Roberta for Question Answering
@@ -114,7 +114,6 @@ class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
 
         self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
-        self.lstm_outputs = nn.LSTM(config.hidden_size, config.hidden_size, batch_first=True)
         self.rnn_outputs = nn.RNN(config.hidden_size, config.hidden_size, batch_first=True)
 
         self.bi_lstm_outputs = bi_lstmLayer(config.hidden_size, config.num_labels)

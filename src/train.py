@@ -62,8 +62,12 @@ def main():
         if model_args.config_name is not None
         else model_args.model_name_or_path,
     )
+
     config.clf_layer = model_args.clf_layer
     config.max_seq_len = data_args.max_seq_length
+    if model_args.clf_layer == "SDS_cnn": # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
+        data_args.pad_to_max_length = True
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name is not None
@@ -325,7 +329,7 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
-    wandb.init(project='JH_MRC_Reader', name=f'[{model_args.clf_layer}] {run_name}')
+    wandb.init(project='MRC_Reader', name=f'[{model_args.clf_layer}] {run_name}')
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
