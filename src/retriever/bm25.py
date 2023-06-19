@@ -12,7 +12,7 @@ import pandas as pd
 from datasets import Dataset, concatenate_datasets, load_from_disk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm.auto import tqdm
-
+from konlpy.tag import Mecab
 
 @contextmanager
 def timer(name):
@@ -221,10 +221,16 @@ class BM25Retrieval:
             }
             if "context" in example.keys() and "answers" in example.keys():
                 # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
-                tmp["original_context"] = example["context"],
+                tmp["original_context"] = example["context"]
                 tmp["true_doc"] = self.context2id[example['context']]
                 # Retrieve한 context id를 반환합니다.
                 tmp["answers"] = example["answers"]
+                int_list = [int(x) for x in tmp['doc_idx'].split()] # top-k document index list
+                try:
+                    ans_idx = int_list.index(tmp['true_doc']) # index of gold document in int_list
+                except ValueError:
+                    ans_idx = -1 # no gold document retrieved in top-k
+                tmp['RR'] = (1 / (ans_idx + 1) if ans_idx + 1 > 0 else 0)
 
             total.append(tmp)
 
@@ -238,7 +244,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
-        "--dataset_name", metavar="../data/train_dataset", type=str, default="../data/train_dataset", help=""
+        "--dataset_name", metavar="../../data/train_dataset", type=str, default="../../data/train_dataset", help=""
     )
     parser.add_argument(
         "--model_name_or_path",
@@ -247,7 +253,7 @@ if __name__ == "__main__":
         type=str,
         help="",
     )
-    parser.add_argument("--data_path", metavar="./data", type=str, default="../data", help="")
+    parser.add_argument("--data_path", metavar="./data", type=str, default="../../data", help="")
     
     parser.add_argument(
         "--context_path", metavar="wikipedia_documents", type=str, default="wikipedia_documents.json", help=""
@@ -268,11 +274,13 @@ if __name__ == "__main__":
     full_ds = full_ds.select(range(10))
     print("*" * 40, "query dataset", "*" * 40)
     print(full_ds)
+    full_ds = full_ds.select(range(10))
 
     from transformers import AutoTokenizer
 
     # tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False,).tokenize
     tokenizer = lambda x : x.split(' ')
+    # tokenizer = Mecab().morphs
 
     retriever = BM25Retrieval(
         tokenize_fn=tokenizer,
@@ -296,3 +304,9 @@ if __name__ == "__main__":
                 df["correct"].sum() / len(df),
             )
 
+    # evaluate retrieval
+    tmp = df.loc[df['RR'] > 0]['RR']
+    MRR = tmp.sum() / len(df)
+    Acc = len(tmp) / len(df)
+    print(f'MRR : {MRR}')
+    print(f'Acc : {Acc}')
