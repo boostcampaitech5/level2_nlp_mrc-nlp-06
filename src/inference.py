@@ -10,6 +10,7 @@ import sys
 from typing import Callable, Dict, List, Tuple
 
 import numpy as np
+import pandas as pd
 from datasets import (
     Dataset,
     DatasetDict,
@@ -124,21 +125,31 @@ def run_sparse_retrieval(
     data_path: str = "./data",
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
+    
+    if data_args.search_mode =="basic":
 
-    # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
-    retriever.get_sparse_embedding()
-
-    if data_args.use_faiss:
-        retriever.build_faiss(num_clusters=data_args.num_clusters)
-        df = retriever.retrieve_faiss(
-            datasetss["validation"], topk=data_args.top_k_retrieval
+        # Query에 맞는 Passage들을 Retrieval 합니다.
+        retriever = SparseRetrieval(
+            tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
         )
-    else:
-        df = retriever.retrieve(
-            datasetss["validation"], topk=data_args.top_k_retrieval)
+        retriever.get_sparse_embedding()
+
+        if data_args.use_faiss:
+            retriever.build_faiss(num_clusters=data_args.num_clusters)
+            df = retriever.retrieve_faiss(
+                datasetss["validation"], topk=data_args.top_k_retrieval
+            )
+        else:
+            df = retriever.retrieve(
+                datasetss["validation"], topk=data_args.top_k_retrieval)
+            
+    elif data_args.search_mode == "elastic":
+        if training_args.do_predict:
+            df = pd.read_csv('es_test_noun_top40.csv')
+            df = df[['context', 'id', 'question']]
+        elif training_args.do_eval:
+            df = pd.read_csv('es_valid_top40.csv')
+            df = df[['answers','context', 'id', 'question']]
 
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
