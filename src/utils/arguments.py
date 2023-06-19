@@ -9,7 +9,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/bert-base",
+        default="klue/robert-large",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -28,6 +28,12 @@ class ModelArguments:
     )
     model_run_name: Optional[str] = field(
         default=None,
+        metadata={
+            "help": "Pretrained model's run name"
+        },
+    )
+    clf_layer: Optional[str] = field(
+        default="linear",
         metadata={
             "help": "Pretrained model's run name"
         },
@@ -89,7 +95,7 @@ class DataTrainingArguments:
         default=64, metadata={"help": "Define how many clusters to use for faiss."}
     )
     top_k_retrieval: int = field(
-        default=10,
+        default=40,
         metadata={
             "help": "Define how many top-k passages to retrieve based on similarity."
         },
@@ -99,6 +105,6 @@ class DataTrainingArguments:
     )
 
     admin: Optional[str] = field(
-        default='MH',
+        default='GE',
         metadata={"help": "The name of the person running this code."},
     )

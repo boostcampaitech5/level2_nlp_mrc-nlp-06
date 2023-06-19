@@ -10,4 +10,6 @@ python ./src/train.py \
 --do_train \
 --do_eval \
 --load_best_model_at_end True \
---metric_for_best_model exact_match
+--metric_for_best_model exact_match \
+--model_name_or_path "gaeunseo/finetuned_model_large"
+
