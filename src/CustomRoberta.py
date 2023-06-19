@@ -20,7 +20,87 @@ class lstmLayer(nn.Module):
         x,_ = self.lstm_outputs(x)
         x = self.tanh(x)
         return self.qa_outputs(x)
-    
+
+class bi_lstmLayer(nn.Module):
+    def __init__(self, hidden_size, num_labels, drop_rate=0.1):
+        super(bi_lstmLayer, self).__init__()
+        self.dropout = nn.Dropout(drop_rate)
+        self.lstm_outputs = nn.LSTM(hidden_size, hidden_size, bidirectional=True, batch_first=True)
+        self.tanh = nn.Tanh()
+        self.qa_outputs = nn.Linear(hidden_size*2, num_labels)
+
+    def forward(self, x):
+        x = self.dropout(x)
+        x,_ = self.lstm_outputs(x)
+        x = self.tanh(x)
+        return self.qa_outputs(x)
+
+class mlp_Layer(nn.Module):
+    def __init__(self, hidden_size, num_labels, drop_rate=0.1):
+        super(mlp_Layer, self).__init__()
+        self.dropout = nn.Dropout(drop_rate)
+        self.linear_layer = nn.Linear(hidden_size, hidden_size)
+        self.gelu = nn.GELU()
+        self.qa_outputs = nn.Linear(hidden_size, num_labels)
+
+    def forward(self, x): # linear layer 1 + fc 
+        x = self.dropout(x)
+        x = self.linear_layer(x)
+        x = self.gelu(x)
+        return self.qa_outputs(x)
+
+class Conv_Layer(nn.Module):
+    """Conv SDS layer for qa output"""
+
+    def __init__(self,hidden_size, input_size):
+        """
+        Args:
+            input_size (int): max sequence lengths
+            hidden_dim (int): backbones's hidden dimension
+        """
+
+        super().__init__()
+        self.conv1 = nn.Conv1d(
+            in_channels=input_size,
+            out_channels=input_size*2,
+            kernel_size=3,
+            padding=1
+        )
+        self.conv2 = nn.Conv1d(
+            in_channels=input_size*2,
+            out_channels=input_size,
+            kernel_size=1,
+        )
+        self.layer_norm = nn.LayerNorm(hidden_size)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = x + torch.relu(out)
+        out = self.layer_norm(out)
+        return out
+
+class SDS_Conv_Layer(nn.Module):
+    """Conv SDS layer for qa output"""
+
+    def __init__(
+        self,hidden_size, input_size, num_labels):
+        """
+        Args:
+            input_size (int): max sequence lengths
+            hidden_dim (int): backbones's hidden dimension
+        """
+
+        super().__init__()
+        convs = []
+        for n in range(5):
+            convs.append(Conv_Layer(hidden_size, input_size))
+        self.convs = nn.Sequential(*convs)
+        self.qa_outputs = nn.Linear(hidden_size, num_labels)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.convs(x)
+        return self.qa_outputs(x)
+           
 class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
     _keys_to_ignore_on_load_missing = [r"position_ids"]
@@ -37,7 +117,10 @@ class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
         self.lstm_outputs = nn.LSTM(config.hidden_size, config.hidden_size, batch_first=True)
         self.rnn_outputs = nn.RNN(config.hidden_size, config.hidden_size, batch_first=True)
 
+        self.bi_lstm_outputs = bi_lstmLayer(config.hidden_size, config.num_labels)
         self.lstm = lstmLayer(config.hidden_size, config.num_labels)
+        self.mlp_outputs = mlp_Layer(config.hidden_size, config.num_labels)
+        self.sds_cnn_outputs = SDS_Conv_Layer(config.hidden_size, config.max_seq_len,config.num_labels)
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -82,9 +165,12 @@ class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
         sequence_output = outputs[0] # last hidden states -> (8,384,1024) == (batch_size, max_seq_len, embedding_dim)
         if self.clf_layer == 'lstm':
             logits = self.lstm(sequence_output)
-            #logits = self.qa_outputs(logits)
-        elif self.clf_layer == 'rnn':
-            logits = self.rnn_outputs(logits)
+        elif self.clf_layer == 'bi_lstm':
+            logits = self.bi_lstm_outputs(sequence_output)
+        elif self.clf_layer == 'mlp':
+            logits = self.mlp_outputs(sequence_output)
+        elif self.clf_layer == 'SDS_cnn':
+            logits =  self.sds_cnn_outputs(sequence_output)
         else:
             logits = self.qa_outputs(sequence_output) # (8,384, 2)
         start_logits, end_logits = logits.split(1, dim=-1) # (8,384, 1) * 2
