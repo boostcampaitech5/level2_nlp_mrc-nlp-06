@@ -54,6 +54,13 @@ def main():
     print("loaded dataset: ")
     print(datasets)
 
+    print(f'Data preprocessing : {data_args.preprocessing}')
+    if data_args.preprocessing:
+        print(f"전처리 전 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+        datasets['train'] = data_preprocessing(datasets['train'])
+        datasets['validation'] = data_preprocessing(datasets['train'])
+        print(f"전처리 후 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(

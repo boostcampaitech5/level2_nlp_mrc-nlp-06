@@ -1,5 +1,6 @@
 python ./src/train.py \
 --output_dir ./models \
+--preprocessing False \
 --num_train_epochs 1 \
 --eval_steps 300 \
 --save_strategy steps \
