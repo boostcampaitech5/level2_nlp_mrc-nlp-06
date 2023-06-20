@@ -2,9 +2,10 @@ import logging
 import os
 import shutil
 import sys
+import pandas as pd
 
 from utils import *
-from datasets import DatasetDict, load_from_disk, load_dataset
+from datasets import DatasetDict, load_from_disk, load_dataset, Dataset
 import evaluate
 from transformers import (
     AutoConfig,
@@ -18,6 +19,7 @@ from transformers import (
 )
 import wandb
 from CustomRoberta import CustomRobertaForQuestionAnswering
+
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +53,13 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    real_data = load_dataset("eojjeolstones/korquard1_and_rawtrain_sampled")
-
     datasets = load_from_disk(data_args.dataset_name)
-    datasets['train'] = real_data['train']
+
+    #추가 데이터를 사용하고 싶다면, 추가 데이터가 포함된 데이터를 사용합니다.
+    if data_args.use_add_data==True:
+        real_data = load_dataset("eojjeolstones/korquard1_and_rawtrain_sampled")
+        datasets['train'] = real_data['train']
+
     print("loaded dataset: ")
     print(datasets)
 
@@ -65,11 +70,7 @@ def main():
         if model_args.config_name is not None
         else model_args.model_name_or_path,
     )
-
     config.clf_layer = model_args.clf_layer
-    config.max_seq_len = data_args.max_seq_length
-    if model_args.clf_layer == "SDS_cnn":  # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
-        data_args.pad_to_max_length = True
 
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
@@ -147,8 +148,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
-            return_token_type_ids=False,
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -242,8 +242,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
-            return_token_type_ids=False,
+            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 
@@ -334,8 +333,8 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
-    wandb.init(project='MRC_Reader',
-               name=f'[{model_args.clf_layer}] {run_name}')
+    #wandb.init(project='MRC_Reader', name='[custom_lstm]'+run_name)
+    wandb.init(project='MRC_Reader', name=run_name)
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:

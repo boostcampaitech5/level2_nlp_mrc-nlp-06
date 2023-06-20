@@ -108,3 +108,8 @@ class DataTrainingArguments:
         default='JH',
         metadata={"help": "The name of the person running this code."},
     )
+
+    use_add_data: Optional[bool] = field(
+        default=False,
+        metadata={'help': 'The mode of using added data.'},
+    )
