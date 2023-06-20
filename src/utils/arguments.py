@@ -108,3 +108,23 @@ class DataTrainingArguments:
         default='GE',
         metadata={"help": "The name of the person running this code."},
     )
+
+    use_add_data: Optional[bool] = field(
+        default=False,
+        metadata={'help': 'The mode of using added data.'},
+    )
+
+    search_mode: Optional[str] = field(
+        default='elastic',
+        metadata={"help": "The mode of sparse retrieval."},
+    )
+
+    valid_elastic_dir:Optional[str] = field(
+        default = 'es_valid_top40.csv',
+        metadata={'help': "The directory ofn elatic validation root"}
+    )
+
+    test_elastic_dir:Optional[str] = field(
+        default = 'es_test_top40.csv',
+        metadata={'help': "The directory ofn elatic test root"}
+    )

@@ -60,6 +60,7 @@ def main():
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
+    print(f"search mode is {data_args.search_mode}")
 
     # logging 설정
     logging.basicConfig(
@@ -126,6 +127,7 @@ def run_sparse_retrieval(
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
     
+  
     if data_args.search_mode =="basic":
 
         # Query에 맞는 Passage들을 Retrieval 합니다.
@@ -145,11 +147,19 @@ def run_sparse_retrieval(
             
     elif data_args.search_mode == "elastic":
         if training_args.do_predict:
-            df = pd.read_csv('es_test_noun_top40.csv')
+            df = pd.read_csv(data_args.test_elastic_dir)
             df = df[['context', 'id', 'question']]
+
         elif training_args.do_eval:
-            df = pd.read_csv('es_valid_top40.csv')
+            df = pd.read_csv(data_args.valid_elastic_dir)
             df = df[['answers','context', 'id', 'question']]
+
+            if type(df['answers'][0])==str:
+                for index, row in df.iterrows():
+                    text = row['answers']
+                    text = re.split("[(|'|)]", text)
+                    df['answers'][index] = {'answer_start':[int(text[3][1:-1])], 'text':[text[8]]}
+
 
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
