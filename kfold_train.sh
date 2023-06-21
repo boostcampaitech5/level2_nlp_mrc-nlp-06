@@ -13,4 +13,5 @@ python ./src/kfold_train.py \
 --metric_for_best_model exact_match \
 --model_name_or_path "gaeunseo/finetuned_model_large" \
 --use_add_data False \
+--preprocessing True \
 --clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] 
