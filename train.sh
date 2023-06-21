@@ -1,5 +1,6 @@
 python ./src/train.py \
 --output_dir ./models \
+--preprocessing False \
 --num_train_epochs 1 \
 --eval_steps 300 \
 --save_strategy steps \
@@ -12,4 +13,5 @@ python ./src/train.py \
 --load_best_model_at_end True \
 --metric_for_best_model exact_match \
 --model_name_or_path "klue/roberta-large" \
---clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn]
+--use_add_data False \
+--clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] 
