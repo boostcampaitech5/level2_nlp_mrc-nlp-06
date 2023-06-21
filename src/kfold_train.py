@@ -21,6 +21,7 @@ import wandb
 from CustomRoberta import CustomRobertaForQuestionAnswering
 from sklearn.model_selection import KFold
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,12 +56,21 @@ def main(datasets):
 
     #추가 데이터를 사용하고 싶다면, 추가 데이터가 포함된 데이터를 사용합니다.
     if data_args.use_add_data==True:
-        print('Add data -> ON')
+        print('ADD DATA ON')
         real_data = load_dataset("eojjeolstones/korquard1_and_rawtrain_sampled")
         datasets['train'] = real_data['train']
 
     print("loaded dataset: ")
     print(datasets)
+
+    print(f'Data preprocessing : {data_args.preprocessing}')
+    if data_args.preprocessing:
+        print('PREPROCESSING ON')
+        print(f"전처리 전 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+        datasets['train'] = data_preprocessing(datasets['train'])
+        datasets['validation'] = data_preprocessing(datasets['validation'])
+        print(f"전처리 후 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(
@@ -331,7 +341,7 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
-    wandb.init(project='MRC_Reader', name='[custom_lstm]'+run_name)
+    wandb.init(project='Kfold_MRC_Reader', name='[Add_data]'+run_name)
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
@@ -380,13 +390,14 @@ def run_mrc(
     wandb.finish()
     shutil.rmtree('./wandb')
 
-
 if __name__ == "__main__":
     print('Kfold train')
-    datasets = load_from_disk("./data/train_dataset")
+    # datasets = load_from_disk("./data/train_dataset")
+    datasets = load_dataset('eojjeolstones/korquard1_and_rawtrain_sampled')
     kf = KFold(n_splits = 5, shuffle = True, random_state = 50)
     org_train = pd.DataFrame(datasets['train'])
-    for train_idx, valid_idx in kf.split(org_train):
+    for i, (train_idx, valid_idx) in enumerate(kf.split(org_train)):
+        print(f'********** {i+1} Kfold **********')
         train, valid = org_train.iloc[train_idx], org_train.iloc[valid_idx]
         kfold_datasets = DatasetDict()
         kfold_datasets['train'] = Dataset.from_pandas(train.drop(columns=['__index_level_0__']))
