@@ -21,7 +21,7 @@ from datasets import (
 import datasets
 import evaluate
 from utils import *
-from retrieval import SparseRetrieval
+from retriever.retrieval import SparseRetrieval
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -87,7 +87,7 @@ def main():
 
     config.clf_layer = model_args.clf_layer
     config.max_seq_len = data_args.max_seq_length
-    if model_args.clf_layer == "SDS_cnn": # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
+    if model_args.clf_layer == "SDS_cnn":  # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
         data_args.pad_to_max_length = True
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -110,7 +110,7 @@ def main():
         )
 
     # True일 경우 : run passage retrieval
-    if data_args.eval_retrieval: 
+    if data_args.eval_retrieval:
         datasetss = run_sparse_retrieval(
             tokenizer.tokenize, datasetss, training_args, data_args,
         )
@@ -172,7 +172,8 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             }
         )
-    datasetss = DatasetDict({"validation": datasets.Dataset.from_pandas(df, features=f)})
+    datasetss = DatasetDict(
+        {"validation": datasets.Dataset.from_pandas(df, features=f)})
     return datasetss
 
 
@@ -213,7 +214,8 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 

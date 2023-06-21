@@ -9,7 +9,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/bert-base",
+        default="klue/robert-large",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -49,6 +49,10 @@ class DataTrainingArguments:
     dataset_name: Optional[str] = field(
         default="./data/train_dataset",
         metadata={"help": "The name of the dataset to use."},
+    )
+    preprocessing: bool = field(
+        default=False,
+        metadata={"help": "Preprocess dataset"}
     )
     overwrite_cache: bool = field(
         default=False,
@@ -107,4 +111,9 @@ class DataTrainingArguments:
     admin: Optional[str] = field(
         default='JH',
         metadata={"help": "The name of the person running this code."},
+    )
+
+    use_add_data: Optional[bool] = field(
+        default=False,
+        metadata={'help': 'The mode of using added data.'},
     )

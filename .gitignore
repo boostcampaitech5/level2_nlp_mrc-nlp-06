@@ -210,6 +210,9 @@ data/
 models/
 predictions/
 wandb/
+eda/
+src/retriever/retrieval_result
+src/retriever/elastic_search/elasticsearch-7.17.10/
 
 .ipython/
 .jupyter/
@@ -231,3 +234,11 @@ wandb/
 .condarc
 
 *.ipynb
+*.csv
+
+!preprocess/*
+
+/ensemble
+setting.sh
+pre_train.*
+/kfold
