@@ -10,8 +10,9 @@ import collections
 # ML 내부에 ensemble 이라는 폴더 필요합니다. 해당 폴더는 files_hard/ files_soft/ outputs 의 하위 폴더를 가집니다.
 # files_hard : hard voting 을 위한 prediction 파일들이 들어가는 곳입니다. 파일 명에 Score 를 꼭 포함해 주셔야 정상적으로 작동합니다.
 # - ex) 70,prediction.json
-# json 파일이 필요하며 파일 명에 _가 포함되는 경우가 많아 이번에는 score 와 file_name 을 구분하기 위해 , 를 사용하였습니다.
+# - json 파일이 필요하며 파일 명에 _가 포함되는 경우가 많아 이번에는 score 와 file_name 을 구분하기 위해 , 를 사용하였습니다.
 # files_soft : soft voting 을 위한 nbest_predictions 파일들이 들어가는 곳 입니다. 파일명 수정하실 필요 없습니다. (점수 포함할 필요 X)
+# outputs : ensemble 결과 파일이 저장되는 곳 입니다.
 
 
 
