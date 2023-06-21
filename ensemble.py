@@ -7,13 +7,12 @@ import argparse
 import json
 import collections
 
-# ML 내부에 inferences 라는 폴더 생성해 주시고, 해당 inferences 폴더 내부에 앙상블 하고자 하는 output.csv 파일을 넣으면
-# 자동으로 긁어와서 ensemble_output.csv 파일을 생성하게 됩니다.
-# *주의* inferences 폴더 내부의 파일은 <파일이름_score.csv> 형식을 지켜주셔야 합니다.
-# ex) inferences/output_0.97.csv
-# '_' 를 기준으로 filename 과 score 를 인식하기 때문에 언더바 사용에 주의해주세요
-# inferences 폴더와 내부 파일 생성 후에는 그냥 python code/ensemble.py 로 작동하시면 됩니다~!
-# -> python src/ensemble.py -m sw
+# ML 내부에 ensemble 이라는 폴더 필요합니다. 해당 폴더는 files_hard/ files_soft/ outputs 의 하위 폴더를 가집니다.
+# files_hard : hard voting 을 위한 prediction 파일들이 들어가는 곳입니다. 파일 명에 Score 를 꼭 포함해 주셔야 정상적으로 작동합니다.
+# - ex) 70,prediction.json
+# json 파일이 필요하며 파일 명에 _가 포함되는 경우가 많아 이번에는 score 와 file_name 을 구분하기 위해 , 를 사용하였습니다.
+# files_soft : soft voting 을 위한 nbest_predictions 파일들이 들어가는 곳 입니다. 파일명 수정하실 필요 없습니다. (점수 포함할 필요 X)
+
 
 
 class Ensemble():
@@ -36,6 +35,7 @@ class Ensemble():
         print('Mode : hard voting')
         HARD_DIR = os.path.join(self.ENSEMBLE_DIR,'files_hard')
         self.files = os.listdir(HARD_DIR)
+        print(self.files,'\n','*'*20)
         dfs = [self.json_to_pandas(HARD_DIR+'/'+file_name) if file_name.find('json')!=-1 else pd.read_csv('./ensemble/files_hard/'+file_name) for file_name in self.files]
         self.scores = [float(file_name.split(',')[0]) for file_name in self.files]
         self.df_list = [dfs[i] for i in np.array(self.scores).argsort()[::-1]]
@@ -68,6 +68,7 @@ class Ensemble():
         print('Mode : soft voting')
         SOFT_DIR = os.path.join(self.ENSEMBLE_DIR,'files_soft')
         self.files = os.listdir(SOFT_DIR)
+        print(self.files,'\n','*'*20)
         self.js_list = [self.json_load(SOFT_DIR+'/'+file_name) if file_name.find('json')!=-1 else pd.read_csv('./ensemble/files_hard/'+file_name) for file_name in self.files]
         ids = self.js_list[0].keys()
 
@@ -85,7 +86,6 @@ class Ensemble():
         ensemble_json = collections.OrderedDict()
         for id,pred in zip(ids, prediction):
             ensemble_json.update({id:pred})
-        breakpoint()
         output = os.path.join('./ensemble/outputs/',"[soft]ensemble_output.json")
         with open(output, "w", encoding="utf-8") as writer:
             writer.write(
