@@ -5,5 +5,5 @@ python ./src/inference.py \
 --eval_retrieval \
 --do_predict \
 --search_mode elastic \
---valid_elastic_dir es_valid_top20.csv \
---test_elastic_dir es_test_noun_top20.csv
+--valid_elastic_dir retrieval/es_valid_top20.csv \
+--test_elastic_dir retrieval/es_test_noun_top20.csv
