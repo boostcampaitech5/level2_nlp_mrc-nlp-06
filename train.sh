@@ -1,5 +1,6 @@
 python ./src/train.py \
 --output_dir ./models \
+--preprocessing True \
 --num_train_epochs 1 \
 --eval_steps 300 \
 --save_strategy steps \
@@ -11,5 +12,6 @@ python ./src/train.py \
 --do_eval \
 --load_best_model_at_end True \
 --metric_for_best_model exact_match \
---model_name_or_path "gaeunseo/finetuned_model_large"
-
+--model_name_or_path "gaeunseo/finetuned_model_large" \
+--use_add_data True \
+--clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] 

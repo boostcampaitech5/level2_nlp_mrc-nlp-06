@@ -2,9 +2,10 @@ import logging
 import os
 import shutil
 import sys
+import pandas as pd
 
 from utils import *
-from datasets import DatasetDict, load_from_disk, load_dataset
+from datasets import DatasetDict, load_from_disk, load_dataset, Dataset
 import evaluate
 from transformers import (
     AutoConfig,
@@ -52,10 +53,20 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    real_data = load_dataset("eojjeolstones/korquard1_and_rawtrain_sampled")
-
     datasets = load_from_disk(data_args.dataset_name)
-    datasets['train'] = real_data['train']
+
+    #추가 데이터를 사용하고 싶다면, 추가 데이터가 포함된 데이터를 사용합니다.
+    if data_args.use_add_data==True:
+        real_data = load_dataset("eojjeolstones/korquard1_and_rawtrain_sampled")
+        datasets['train'] = real_data['train']
+
+    print(f'Data preprocessing : {data_args.preprocessing}')
+    if data_args.preprocessing:
+        print(f"전처리 전 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+        datasets['train'] = data_preprocessing(datasets['train'])
+        datasets['validation'] = data_preprocessing(datasets['validation'])
+        print(f"전처리 후 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+
     print("loaded dataset: ")
     print(datasets)
 

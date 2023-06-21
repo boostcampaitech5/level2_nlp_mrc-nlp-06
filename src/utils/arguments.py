@@ -50,6 +50,10 @@ class DataTrainingArguments:
         default="./data/train_dataset",
         metadata={"help": "The name of the dataset to use."},
     )
+    preprocessing: bool = field(
+        default=False,
+        metadata={"help": "Preprocess dataset"}
+    )
     overwrite_cache: bool = field(
         default=False,
         metadata={"help": "Overwrite the cached training and evaluation sets"},
