@@ -23,7 +23,7 @@ def data_preprocessing(dataset):
             text = re.sub(pattern, " ", text)
             return text, answer_idx
         
-        patterns = [r"\n", r"\\n", r"#", r"\s+"]
+        patterns = [r"\n", r"\\n", r"#", r"[^A-Za-z0-9가-힣.?!,()~‘’“”"":%&《》〈〉''㈜·\-\'+\s一-龥サマーン≪ㅋい\"よ」≫な＜・うし＞』äら°の>「∧/\\xadに<『]", r"\s+"]
         i_text = item['context']
         i_answer_idx = item['answers']['answer_start'][0]
         for p in patterns:
