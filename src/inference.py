@@ -22,7 +22,7 @@ from datasets import (
 import datasets
 import evaluate
 from utils import *
-from retrieval import SparseRetrieval
+from retriever.retrieval import SparseRetrieval
 from transformers import (
     AutoConfig,
     AutoModelForQuestionAnswering,
@@ -33,7 +33,7 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
-# from CustomRoberta import CustomRobertaForQuestionAnswering
+from CustomRoberta import CustomRobertaForQuestionAnswering
 
 
 logger = logging.getLogger(__name__)
@@ -86,25 +86,30 @@ def main():
         if model_args.config_name
         else model_args.model_name_or_path,
     )
+
     config.clf_layer = model_args.clf_layer
+    config.max_seq_len = data_args.max_seq_length
+    if model_args.clf_layer == "SDS_cnn":  # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
+        data_args.pad_to_max_length = True
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
         else model_args.model_name_or_path,
         use_fast=True,
     )
-    #if model_args.clf_layer == "linear":
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
+    if model_args.clf_layer == "linear":
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
         )
-    #else:
-    #    model = CustomRobertaForQuestionAnswering.from_pretrained(
-    #        model_args.model_name_or_path,
-    #        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-    #        config=config,
-    #    )
+    else:
+        model = CustomRobertaForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
@@ -188,7 +193,8 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             }
         )
-    datasetss = DatasetDict({"validation": datasets.Dataset.from_pandas(df, features=f)})
+    datasetss = DatasetDict(
+        {"validation": datasets.Dataset.from_pandas(df, features=f)})
     return datasetss
 
 
@@ -229,7 +235,8 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False,
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 

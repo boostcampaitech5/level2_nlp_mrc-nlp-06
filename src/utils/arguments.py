@@ -109,7 +109,7 @@ class DataTrainingArguments:
     )
 
     admin: Optional[str] = field(
-        default='GE',
+        default='JH',
         metadata={"help": "The name of the person running this code."},
     )
 
