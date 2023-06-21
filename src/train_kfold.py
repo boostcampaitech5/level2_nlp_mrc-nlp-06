@@ -18,7 +18,7 @@ from transformers import (
 )
 import wandb
 from CustomRoberta import CustomRobertaForQuestionAnswering
-import pandas as pd
+from sklearn.model_selection import KFold
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +52,7 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    # datasets = load_from_disk(data_args.dataset_name)
-    sorted_train = pd.read_csv('./data/train_dataset/train/sorted_train.csv')
-    for index, row in sorted_train.iterrows():
-        text = row['answers']
-        text = re.split("[(|'|)]", text)
-        sorted_train['answers'][index] = {
-            'answer_start': [int(text[3][1:-1])], 'text': [text[8]]}
-
-    datasets = DatasetDict({
-        'train': Dataset.from_pandas(sorted_train),
-        'validation': load_from_disk(os.path.join(data_args.dataset_name, 'validation'))
-    })
+    datasets = load_from_disk(data_args.dataset_name)
     print("loaded dataset: ")
     print(datasets)
 
@@ -104,8 +93,20 @@ def main():
 
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
-        run_mrc(data_args, training_args, model_args,
-                datasets, tokenizer, model)
+        if data_args.num_kfold is None:
+            run_mrc(data_args, training_args, model_args,
+                    datasets, tokenizer, model)
+        else:
+            kf = KFold(data_args.num_kfold)
+            for i, (train_idx, valid_idx) in enumerate(kf.split(datasets['train'])):
+                print(f'***{i+1}-th Split Dataset***')
+                train = Dataset.from_dict(datasets['train'][train_idx])
+                valid = Dataset.from_dict(datasets['train'][valid_idx])
+                kfold_datasetdict = DatasetDict(
+                    {'train': train, 'validation': valid})
+
+                run_mrc(data_args, training_args, model_args,
+                        kfold_datasetdict, tokenizer, model)
 
 
 def run_mrc(

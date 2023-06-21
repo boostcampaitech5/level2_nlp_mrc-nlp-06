@@ -105,6 +105,11 @@ class DataTrainingArguments:
     )
 
     admin: Optional[str] = field(
-        default='JH',
+        default='MH',
         metadata={"help": "The name of the person running this code."},
+    )
+
+    num_kfold: Optional[int] = field(
+        default=None,
+        metadata={"help": "The number to split data."},
     )
