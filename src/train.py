@@ -340,7 +340,7 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
-    wandb.init(project='MRC_Reader', name='[custom_lstm]'+run_name)
+    wandb.init(project='MRC_Reader', name=run_name)
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
