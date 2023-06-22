@@ -54,18 +54,18 @@ def main():
     # 모델을 초기화하기 전에 난수를 고정합니다.
     set_seed(training_args.seed)
 
-    # datasets = load_from_disk(data_args.dataset_name)
-    sorted_train = pd.read_csv('./data/train_dataset/train/sorted_train.csv')
-    for index, row in sorted_train.iterrows():
-        text = row['answers']
-        text = re.split("[(|'|)]", text)
-        sorted_train['answers'][index] = {
-            'answer_start': [int(text[3][1:-1])], 'text': [text[8]]}
+    datasets = load_from_disk(data_args.dataset_name)
+    # sorted_train = pd.read_csv('./data/train_dataset/train/sorted_train5.csv')
+    # for index, row in sorted_train.iterrows():
+    #     text = row['answers']
+    #     text = re.split("[(|'|)]", text)
+    #     sorted_train['answers'][index] = {
+    #         'answer_start': [int(text[3][1:-1])], 'text': [text[8]]}
 
-    datasets = DatasetDict({
-        'train': Dataset.from_pandas(sorted_train),
-        'validation': load_from_disk(os.path.join(data_args.dataset_name, 'validation'))
-    })
+    # datasets = DatasetDict({
+    #     'train': Dataset.from_pandas(sorted_train),
+    #     'validation': load_from_disk(os.path.join(data_args.dataset_name, 'validation'))
+    # })
 
     # 추가 데이터를 사용하고 싶다면, 추가 데이터가 포함된 데이터를 사용합니다.
     if data_args.use_add_data == True:
@@ -109,6 +109,11 @@ def main():
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
         )
+
+    if model_args.model_run_name is not None:
+        model_file = f'models/{model_args.model_run_name}/pytorch_model.bin'
+        state_dict = torch.load(model_file)
+        model.load_state_dict(state_dict)
 
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
