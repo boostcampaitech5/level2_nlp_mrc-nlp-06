@@ -14,4 +14,5 @@ python ./src/train.py \
 --metric_for_best_model exact_match \
 --model_name_or_path "klue/roberta-large" \
 --use_add_data False \
+--do_balanced_sampling True \
 --clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] 

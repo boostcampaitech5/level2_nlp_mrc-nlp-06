@@ -237,6 +237,45 @@ def run_mrc(
             load_from_cache_file=not data_args.overwrite_cache,
         )
 
+        if data_args.do_balanced_sampling==True:
+            train_df = pd.DataFrame(train_dataset)
+
+            get_document_ids = []
+            temp_question = train_df['input_ids'][0][(train_df['input_ids'][0].index(0)):(train_df['input_ids'][0].index(2)+1)]
+            i=0
+            for index, row in train_df.iterrows():
+                if row['input_ids'][(row['input_ids'].index(0)):(row['input_ids'].index(2)+1)] == temp_question:
+                    get_document_ids.append(i)
+                else:
+                    i+=1
+                    get_document_ids.append(i)
+                    temp_question = row['input_ids'][(row['input_ids'].index(0)):(row['input_ids'].index(2)+1)]
+
+            train_df['document_ids'] = get_document_ids
+            
+            for_concat = []
+            for d in set(get_document_ids):
+                answer_indexs = list(train_df[train_df['document_ids']==d][train_df['end_positions']!=0].index)
+                no_answer_indexs = list(train_df[train_df['document_ids']==d][train_df['end_positions']==0].index)
+                if (2 * len(answer_indexs)) <= len(no_answer_indexs):
+                    for_concat.extend(answer_indexs)
+                    no_answer_indexs = random.sample(no_answer_indexs, k=(2 * len(answer_indexs)))
+                    for_concat.extend(no_answer_indexs)
+                elif len(answer_indexs) <= len(no_answer_indexs) <( 2 * len(answer_indexs)):
+                    for_concat.extend(answer_indexs)
+                    no_answer_indexs = random.sample(no_answer_indexs, k=len(answer_indexs))
+                    for_concat.extend(no_answer_indexs)
+                elif 0 < len(no_answer_indexs) < len(answer_indexs) :
+                    for_concat.extend(answer_indexs)
+                    for_concat.extend(no_answer_indexs)
+                elif len(no_answer_indexs) == 0:
+                    for_concat.extend(answer_indexs)
+
+            sampled_df = train_df.loc[for_concat]
+            sampled_df = sampled_df.reset_index(drop=True)
+            sampled_df = sampled_df.drop(labels=['document_ids'], axis=1)
+            train_dataset = Dataset.from_pandas(sampled_df)
+
     # Validation preprocessing
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
