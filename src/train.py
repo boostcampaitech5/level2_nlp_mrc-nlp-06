@@ -55,17 +55,6 @@ def main():
     set_seed(training_args.seed)
 
     datasets = load_from_disk(data_args.dataset_name)
-    # sorted_train = pd.read_csv('./data/train_dataset/train/sorted_train5.csv')
-    # for index, row in sorted_train.iterrows():
-    #     text = row['answers']
-    #     text = re.split("[(|'|)]", text)
-    #     sorted_train['answers'][index] = {
-    #         'answer_start': [int(text[3][1:-1])], 'text': [text[8]]}
-
-    # datasets = DatasetDict({
-    #     'train': Dataset.from_pandas(sorted_train),
-    #     'validation': load_from_disk(os.path.join(data_args.dataset_name, 'validation'))
-    # })
 
     # 추가 데이터를 사용하고 싶다면, 추가 데이터가 포함된 데이터를 사용합니다.
     if data_args.use_add_data == True:
@@ -78,10 +67,12 @@ def main():
 
     print(f'Data preprocessing : {data_args.preprocessing}')
     if data_args.preprocessing:
-        print(f"전처리 전 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+        print(
+            f"전처리 전 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
         datasets['train'] = data_preprocessing(datasets['train'])
         datasets['validation'] = data_preprocessing(datasets['validation'])
-        print(f"전처리 후 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
+        print(
+            f"전처리 후 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
