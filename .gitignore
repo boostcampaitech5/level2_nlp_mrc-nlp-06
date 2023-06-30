@@ -237,3 +237,8 @@ src/retriever/elastic_search/elasticsearch-7.17.10/
 *.csv
 
 !preprocess/*
+
+setting.sh
+pre_train.*
+/kfold
+
