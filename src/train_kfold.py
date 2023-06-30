@@ -2,10 +2,9 @@ import logging
 import os
 import shutil
 import sys
-import pandas as pd
 
 from utils import *
-from datasets import DatasetDict, load_from_disk, load_dataset, Dataset
+from datasets import DatasetDict, load_from_disk, Dataset
 import evaluate
 from transformers import (
     AutoConfig,
@@ -19,8 +18,7 @@ from transformers import (
 )
 import wandb
 from CustomRoberta import CustomRobertaForQuestionAnswering
-import pandas as pd
-
+from sklearn.model_selection import KFold
 
 logger = logging.getLogger(__name__)
 
@@ -55,24 +53,8 @@ def main():
     set_seed(training_args.seed)
 
     datasets = load_from_disk(data_args.dataset_name)
-
-    # 추가 데이터를 사용하고 싶다면, 추가 데이터가 포함된 데이터를 사용합니다.
-    if data_args.use_add_data == True:
-        real_data = load_dataset(
-            "eojjeolstones/korquard1_and_rawtrain_sampled")
-        datasets['train'] = real_data['train']
-
     print("loaded dataset: ")
     print(datasets)
-
-    print(f'Data preprocessing : {data_args.preprocessing}')
-    if data_args.preprocessing:
-        print(
-            f"전처리 전 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
-        datasets['train'] = data_preprocessing(datasets['train'])
-        datasets['validation'] = data_preprocessing(datasets['validation'])
-        print(
-            f"전처리 후 train context 총 길이 {len(' '.join([i for i in datasets['train']['context']]))}")
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
@@ -81,6 +63,7 @@ def main():
         if model_args.config_name is not None
         else model_args.model_name_or_path,
     )
+
     config.clf_layer = model_args.clf_layer
     config.max_seq_len = data_args.max_seq_length
     if model_args.clf_layer == "SDS_cnn":  # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
@@ -108,15 +91,22 @@ def main():
             config=config,
         )
 
-    if model_args.model_run_name is not None:
-        model_file = f'models/{model_args.model_run_name}/pytorch_model.bin'
-        state_dict = torch.load(model_file)
-        model.load_state_dict(state_dict)
-
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
-        run_mrc(data_args, training_args, model_args,
-                datasets, tokenizer, model)
+        if data_args.num_kfold is None:
+            run_mrc(data_args, training_args, model_args,
+                    datasets, tokenizer, model)
+        else:
+            kf = KFold(data_args.num_kfold)
+            for i, (train_idx, valid_idx) in enumerate(kf.split(datasets['train'])):
+                print(f'***{i+1}-th Split Dataset***')
+                train = Dataset.from_dict(datasets['train'][train_idx])
+                valid = Dataset.from_dict(datasets['train'][valid_idx])
+                kfold_datasetdict = DatasetDict(
+                    {'train': train, 'validation': valid})
+
+                run_mrc(data_args, training_args, model_args,
+                        kfold_datasetdict, tokenizer, model)
 
 
 def run_mrc(
@@ -250,51 +240,6 @@ def run_mrc(
             load_from_cache_file=not data_args.overwrite_cache,
         )
 
-        if data_args.do_balanced_sampling == True:
-            train_df = pd.DataFrame(train_dataset)
-
-            get_document_ids = []
-            temp_question = train_df['input_ids'][0][(
-                train_df['input_ids'][0].index(0)):(train_df['input_ids'][0].index(2)+1)]
-            i = 0
-            for index, row in train_df.iterrows():
-                if row['input_ids'][(row['input_ids'].index(0)):(row['input_ids'].index(2)+1)] == temp_question:
-                    get_document_ids.append(i)
-                else:
-                    i += 1
-                    get_document_ids.append(i)
-                    temp_question = row['input_ids'][(
-                        row['input_ids'].index(0)):(row['input_ids'].index(2)+1)]
-
-            train_df['document_ids'] = get_document_ids
-
-            for_concat = []
-            for d in set(get_document_ids):
-                answer_indexs = list(
-                    train_df[train_df['document_ids'] == d][train_df['end_positions'] != 0].index)
-                no_answer_indexs = list(
-                    train_df[train_df['document_ids'] == d][train_df['end_positions'] == 0].index)
-                if (2 * len(answer_indexs)) <= len(no_answer_indexs):
-                    for_concat.extend(answer_indexs)
-                    no_answer_indexs = random.sample(
-                        no_answer_indexs, k=(2 * len(answer_indexs)))
-                    for_concat.extend(no_answer_indexs)
-                elif len(answer_indexs) <= len(no_answer_indexs) < (2 * len(answer_indexs)):
-                    for_concat.extend(answer_indexs)
-                    no_answer_indexs = random.sample(
-                        no_answer_indexs, k=len(answer_indexs))
-                    for_concat.extend(no_answer_indexs)
-                elif 0 < len(no_answer_indexs) < len(answer_indexs):
-                    for_concat.extend(answer_indexs)
-                    for_concat.extend(no_answer_indexs)
-                elif len(no_answer_indexs) == 0:
-                    for_concat.extend(answer_indexs)
-
-            sampled_df = train_df.loc[for_concat]
-            sampled_df = sampled_df.reset_index(drop=True)
-            sampled_df = sampled_df.drop(labels=['document_ids'], axis=1)
-            train_dataset = Dataset.from_pandas(sampled_df)
-
     # Validation preprocessing
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
@@ -399,7 +344,8 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
-    wandb.init(project='MRC_Reader', name=run_name)
+    wandb.init(project='MRC_Reader',
+               name=f'[{model_args.clf_layer}] {run_name}')
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
