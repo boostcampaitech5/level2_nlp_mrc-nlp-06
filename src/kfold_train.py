@@ -394,7 +394,7 @@ if __name__ == "__main__":
     print('Kfold train')
     # datasets = load_from_disk("./data/train_dataset")
     datasets = load_dataset('eojjeolstones/korquard1_and_rawtrain_sampled')
-    print('Total dataset:',datasets)
+
     kf = KFold(n_splits = 5, shuffle = True, random_state = 50)
     org_train = pd.DataFrame(datasets['train'])
     for i, (train_idx, valid_idx) in enumerate(kf.split(org_train)):

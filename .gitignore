@@ -238,7 +238,7 @@ src/retriever/elastic_search/elasticsearch-7.17.10/
 
 !preprocess/*
 
-/ensemble
 setting.sh
 pre_train.*
 /kfold
+
