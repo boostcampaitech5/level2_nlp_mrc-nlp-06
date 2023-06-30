@@ -10,6 +10,7 @@ import sys
 from typing import Callable, Dict, List, Tuple
 
 import numpy as np
+import pandas as pd
 from datasets import (
     Dataset,
     DatasetDict,
@@ -59,6 +60,7 @@ def main():
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.dataset_name}")
+    print(f"search mode is {data_args.search_mode}")
 
     # logging 설정
     logging.basicConfig(
@@ -129,21 +131,40 @@ def run_sparse_retrieval(
     data_path: str = "./data",
     context_path: str = "wikipedia_documents.json",
 ) -> DatasetDict:
+    
+  
+    if data_args.search_mode =="basic":
 
-    # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
-    retriever.get_sparse_embedding()
-
-    if data_args.use_faiss:
-        retriever.build_faiss(num_clusters=data_args.num_clusters)
-        df = retriever.retrieve_faiss(
-            datasetss["validation"], topk=data_args.top_k_retrieval
+        # Query에 맞는 Passage들을 Retrieval 합니다.
+        retriever = SparseRetrieval(
+            tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
         )
-    else:
-        df = retriever.retrieve(
-            datasetss["validation"], topk=data_args.top_k_retrieval)
+        retriever.get_sparse_embedding()
+
+        if data_args.use_faiss:
+            retriever.build_faiss(num_clusters=data_args.num_clusters)
+            df = retriever.retrieve_faiss(
+                datasetss["validation"], topk=data_args.top_k_retrieval
+            )
+        else:
+            df = retriever.retrieve(
+                datasetss["validation"], topk=data_args.top_k_retrieval)
+            
+    elif data_args.search_mode == "elastic":
+        if training_args.do_predict:
+            df = pd.read_csv(data_args.test_elastic_dir)
+            df = df[['context', 'id', 'question']]
+
+        elif training_args.do_eval:
+            df = pd.read_csv(data_args.valid_elastic_dir)
+            df = df[['answers','context', 'id', 'question']]
+
+            if type(df['answers'][0])==str:
+                for index, row in df.iterrows():
+                    text = row['answers']
+                    text = re.split("[(|'|)]", text)
+                    df['answers'][index] = {'answer_start':[int(text[3][1:-1])], 'text':[text[8]]}
+
 
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
