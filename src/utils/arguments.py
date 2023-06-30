@@ -132,3 +132,7 @@ class DataTrainingArguments:
         default = 'es_test_top40.csv',
         metadata={'help': "The directory ofn elatic test root"}
     )
+
+    do_balanced_sampling:Optional[bool] = field(
+        default=False,
+    )
