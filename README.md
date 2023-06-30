@@ -66,3 +66,8 @@
 ### 4.5. 기타
 - Self-distillation
 - Post-processing
+
+
+# 👀 Wrap-up Report
+
+[https://docs.google.com/document/d/1ukhlsVAO_0NFwtCzAOifblNhNOXxd0g7n4raSZT-bck/edit?usp=sharing]
