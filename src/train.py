@@ -19,7 +19,7 @@ from transformers import (
 )
 import wandb
 from CustomRoberta import CustomRobertaForQuestionAnswering
-
+from transformers.models.roberta.modeling_roberta import RobertaForQuestionAnswering
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,8 @@ def main():
         else model_args.model_name_or_path,
     )
     config.clf_layer = model_args.clf_layer
+    config.distill = model_args.distill
+    config.max_seq_len = data_args.max_seq_length
 
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
@@ -88,7 +90,7 @@ def main():
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
-    if model_args.clf_layer == "linear":
+    if model_args.clf_layer == "linear" and not config.distill:
         model = AutoModelForQuestionAnswering.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -100,6 +102,12 @@ def main():
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
         )
+        if model_args.distill:
+            print('*'*20)
+            print('knowledge distillation: True')
+            print('*'*20)
+            model.distill_model = RobertaForQuestionAnswering.from_pretrained(
+            model_args.distill_dir).cuda()
 
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
@@ -340,7 +348,7 @@ def run_mrc(
         compute_metrics=compute_metrics,
     )
 
-    wandb.init(project='MRC_Reader', name='[custom_lstm]'+run_name)
+    wandb.init(project='JH_MRC_Reader', name=run_name)
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
@@ -350,6 +358,8 @@ def run_mrc(
         else:
             checkpoint = None
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        if model_args.distill:
+            del model.distill_model
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics

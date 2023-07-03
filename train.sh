@@ -14,4 +14,6 @@ python ./src/train.py \
 --metric_for_best_model exact_match \
 --model_name_or_path "klue/roberta-large" \
 --use_add_data False \
---clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] 
+--clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] \
+--distill True \
+--distill_dir ./models/[add_data]0622_23:30:08_JH \
