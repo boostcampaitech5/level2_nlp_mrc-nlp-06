@@ -2,7 +2,8 @@ from typing import Optional, Union, Tuple
 import torch
 import torch.nn as nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from transformers.models.roberta.modeling_roberta import RobertaPreTrainedModel,RobertaModel,QuestionAnsweringModelOutput
+import torch.nn.functional as F
+from transformers.models.roberta.modeling_roberta import RobertaPreTrainedModel,RobertaModel,QuestionAnsweringModelOutput,RobertaForQuestionAnswering
 
 """
 Custom Roberta for Question Answering
@@ -101,6 +102,41 @@ class SDS_Conv_Layer(nn.Module):
         x = self.convs(x)
         return self.qa_outputs(x)
            
+def knowledge_distill(distill_model,start_logits, end_logits, input_ids,
+                attention_mask,
+                token_type_ids,
+                position_ids,
+                head_mask,
+                inputs_embeds,
+                output_attentions,
+                output_hidden_states,
+                return_dict):
+    distill_model.eval()
+    t_outputs = distill_model(input_ids,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,)
+
+    t_start_logits, t_end_logits = t_outputs['start_logits'], t_outputs['end_logits']
+    #t_start_logits.requires_grad_(True)
+    #t_end_logits.requires_grad_(True)
+    # Distill logits
+    temperature = 1.0
+
+    kl_loss = nn.KLDivLoss(reduction='none')
+    kl_start = (kl_loss(
+        F.log_softmax(start_logits/temperature, dim=1), target=F.softmax((t_start_logits/temperature)[:,:start_logits.size(1)], dim=1)
+    ).sum(1)).mean(0)
+    kl_end =  (kl_loss(
+        F.log_softmax(end_logits/temperature, dim=1), target=F.softmax((t_end_logits/temperature)[:,:end_logits.size(1)], dim=1)
+    ).sum(1)).mean(0)
+
+    return (kl_start + kl_end)/2.0 * 0.5
 class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
     _keys_to_ignore_on_load_missing = [r"position_ids"]
@@ -108,18 +144,26 @@ class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
-        
         # 추가 : classification 전에 어떤 layer 를 태울 것인지
         self.clf_layer = config.clf_layer
 
+        # model
         self.roberta = RobertaModel(config, add_pooling_layer=False)
-        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
-        self.rnn_outputs = nn.RNN(config.hidden_size, config.hidden_size, batch_first=True)
 
-        self.bi_lstm_outputs = bi_lstmLayer(config.hidden_size, config.num_labels)
-        self.lstm = lstmLayer(config.hidden_size, config.num_labels)
-        self.mlp_outputs = mlp_Layer(config.hidden_size, config.num_labels)
-        self.sds_cnn_outputs = SDS_Conv_Layer(config.hidden_size, config.max_seq_len,config.num_labels)
+        # clf layer
+        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+        if config.clf_layer == 'bi_lstm':
+            self.bi_lstm_outputs = bi_lstmLayer(config.hidden_size, config.num_labels)
+        elif config.clf_layer == 'lstm':
+            self.lstm = lstmLayer(config.hidden_size, config.num_labels)
+        elif config.clf_layer == 'mlp':
+            self.mlp_outputs = mlp_Layer(config.hidden_size, config.num_labels)
+        elif config.clf_layer == 'SDS_cnn':
+            self.sds_cnn_outputs = SDS_Conv_Layer(config.hidden_size, config.max_seq_len,config.num_labels)
+
+        # self distillation
+        self.distill_model = None
+        self.distill = config.distill
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -180,7 +224,7 @@ class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
         if start_positions is not None and end_positions is not None:
             # If we are on multi-GPU, split add a dimension
             if len(start_positions.size()) > 1:
-                start_positions = start_positions.squeeze(-1)
+                start_positions = start_positions.sqnueeze(-1)
             if len(end_positions.size()) > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
@@ -192,6 +236,16 @@ class CustomRobertaForQuestionAnswering(RobertaPreTrainedModel):
             start_loss = loss_fct(start_logits, start_positions)
             end_loss = loss_fct(end_logits, end_positions)
             total_loss = (start_loss + end_loss) / 2
+            if self.distill and total_loss is not None:
+                total_loss = total_loss + knowledge_distill(self.distill_model,start_logits, end_logits,input_ids,
+                    attention_mask,
+                    token_type_ids,
+                    position_ids,
+                    head_mask,
+                    inputs_embeds,
+                    output_attentions,
+                    output_hidden_states,
+                    return_dict)
 
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]

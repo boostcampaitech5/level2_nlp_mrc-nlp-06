@@ -35,7 +35,20 @@ class ModelArguments:
     clf_layer: Optional[str] = field(
         default="linear",
         metadata={
-            "help": "Pretrained model's run name"
+            "help": "Custom classification layer"
+        },
+    )
+    distill: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "Knowledge distillation setting"
+        },
+    )
+
+    distill_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Pretrained model for Knowledge distillation"
         },
     )
 

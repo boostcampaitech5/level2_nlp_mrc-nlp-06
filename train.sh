@@ -15,4 +15,6 @@ python ./src/train.py \
 --model_name_or_path "klue/roberta-large" \
 --use_add_data False \
 --do_balanced_sampling True \
---clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] 
+--clf_layer linear # default: linear | other options: [lstm, bi_lstm, mlp, SDS_cnn] \
+--distill True \
+--distill_dir ./models/[add_data]0622_23:30:08_JH \

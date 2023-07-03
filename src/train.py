@@ -19,8 +19,7 @@ from transformers import (
 )
 import wandb
 from CustomRoberta import CustomRobertaForQuestionAnswering
-import pandas as pd
-
+from transformers.models.roberta.modeling_roberta import RobertaForQuestionAnswering
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +81,7 @@ def main():
         else model_args.model_name_or_path,
     )
     config.clf_layer = model_args.clf_layer
+    config.distill = model_args.distill
     config.max_seq_len = data_args.max_seq_length
     if model_args.clf_layer == "SDS_cnn":  # SDS_CNN layer 추가시에 자동으로 pad_to_max_length 변경
         data_args.pad_to_max_length = True
@@ -95,7 +95,7 @@ def main():
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
-    if model_args.clf_layer == "linear":
+    if model_args.clf_layer == "linear" and not config.distill:
         model = AutoModelForQuestionAnswering.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -107,12 +107,13 @@ def main():
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
         )
-
-    if model_args.model_run_name is not None:
-        model_file = f'models/{model_args.model_run_name}/pytorch_model.bin'
-        state_dict = torch.load(model_file)
-        model.load_state_dict(state_dict)
-
+        if model_args.distill:
+            print('*'*20)
+            print('knowledge distillation: True')
+            print('*'*20)
+            model.distill_model = RobertaForQuestionAnswering.from_pretrained(
+            model_args.distill_dir).cuda()
+            
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
         run_mrc(data_args, training_args, model_args,
@@ -409,6 +410,8 @@ def run_mrc(
         else:
             checkpoint = None
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        if model_args.distill:
+            del model.distill_model
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
