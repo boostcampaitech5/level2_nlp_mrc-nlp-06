@@ -6,6 +6,7 @@ from tqdm import tqdm
 from elasticsearch import Elasticsearch
 
 def es_setting():
+    # Elasticsearch 서버 접속
     es = Elasticsearch(["http://127.0.0.1:9200"])
     print('Elastic search ping:', es.ping())
     print('Elastic search info:')
@@ -13,6 +14,7 @@ def es_setting():
     return es
 
 def create_index(es, index):
+    # Elasticsearch 서버에 인덱스 생성
     INDEX_SETTINGS = {
         "settings": {
             "analysis": {
@@ -51,10 +53,11 @@ def create_index(es, index):
     return es.indices.create(index=index, body=INDEX_SETTINGS)
 
 def preprocess(text):
+    # Elasticsearch 인덱스에 삽입하기 전 context 전처리
     text = re.sub(r"\n", " ", text)
     text = re.sub(r"\\n", " ", text)
     text = re.sub(r"#", " ", text)
-    text = re.sub(r"[^A-Za-z0-9가-힣.?!,()~‘’“”"":%*&《》〈〉''㈜·\-\'+\s一-龥サマーン]", "", text)  
+    text = re.sub(r"[^A-Za-z0-9가-힣.?!,()~‘’“”"":%&《》〈〉''㈜·\-\'+\s一-龥サマーン≪ㅋい\"よ」≫な＜・うし＞』äら°の>「∧/\\xadに<『]", "", text)  
     text = re.sub(r"\s+", " ", text).strip()  # 두 개 이상의 연속된 공백을 하나로 치환
     
     return text

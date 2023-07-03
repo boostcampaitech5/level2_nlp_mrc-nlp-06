@@ -9,7 +9,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        default="klue/robert-large",
+        default="klue/roberta-large",
         metadata={
             "help": "Path to pretrained model or model identifier from huggingface.co/models"
         },
@@ -122,8 +122,13 @@ class DataTrainingArguments:
     )
 
     admin: Optional[str] = field(
-        default='JH',
+        default='MH',
         metadata={"help": "The name of the person running this code."},
+    )
+
+    num_kfold: Optional[int] = field(
+        default=None,
+        metadata={"help": "The number to split data."},
     )
 
     use_add_data: Optional[bool] = field(
@@ -136,12 +141,16 @@ class DataTrainingArguments:
         metadata={"help": "The mode of sparse retrieval."},
     )
 
-    valid_elastic_dir:Optional[str] = field(
-        default = 'es_valid_top40.csv',
+    valid_elastic_dir: Optional[str] = field(
+        default='es_valid_top40.csv',
         metadata={'help': "The directory ofn elatic validation root"}
     )
 
-    test_elastic_dir:Optional[str] = field(
-        default = 'es_test_top40.csv',
+    test_elastic_dir: Optional[str] = field(
+        default='es_test_top40.csv',
         metadata={'help': "The directory ofn elatic test root"}
+    )
+
+    do_balanced_sampling: Optional[bool] = field(
+        default=False,
     )
